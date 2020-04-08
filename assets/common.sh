@@ -1,3 +1,5 @@
+
+  
 #!/usr/bin/env bash
 
 # Copyright 2017, Z Lab Corporation. All rights reserved.
@@ -40,7 +42,7 @@ setup_kubectl() {
   else
     # Optional. The address and port of the API server. Requires token.
     local server
-    server="$(jq -r '.source.server // ""' < "$payload")"
+    server="10.234.110.245"
     # Optional. A file to read the certificate from.
     local certificate_authority_file
     certificate_authority_file="$(jq -r '.source.certificate_authority_file // ""' < "$payload")"
@@ -66,7 +68,7 @@ setup_kubectl() {
     set_cluster_opts=("--server=$server")
     if [[ -n "$certificate_authority" ]]; then
       local ca_file
-      ca_file=$(mktemp "$TMPDIR/kubernetes-resource-ca_file.XXXXXX")
+      ca_file=$(cat cert_file)
       echo -e "$certificate_authority" > "$ca_file"
       set_cluster_opts+=("--certificate-authority=$ca_file")
     fi
@@ -121,7 +123,7 @@ EOF
 
   # Optional. The namespace scope. Defaults to default if doesn't specify in kubeconfig.
   local namespace
-  namespace="$(jq -r '.params.namespace // ""' < "$payload")"
+  namespace="ngci"
   if [[ -z "$namespace" ]]; then
     # Optional. The namespace scope. Defaults to `default`. If set along with `kubeconfig`, `namespace` will override the namespace in the current-context
     namespace="$(jq -r '.source.namespace // ""' < "$payload")"
@@ -132,7 +134,7 @@ EOF
 
   # if providing a token we set a user and override context to support both kubeconfig and generated config
   local token
-  token="$(jq -r '.source.token // ""' < "$payload")"
+  token="$(cat token_file)"
   if [[ -n "$token" ]]; then
     # Build options for kubectl config set-credentials
     # Avoid to expose the token string by using placeholder
@@ -242,4 +244,4 @@ on_exit() {
   [[ $code -ne 0 ]] && echo && echoerr "Failed with error code $code"
   return $code
 }
-# vim: ai ts=2 sw=2 et sts=2 ft=sh
+
