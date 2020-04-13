@@ -6,7 +6,7 @@ ARG KUBERNETES_VERSION=
 
 # Do NOT update the next line manually, please use ./scripts/update-aws-iam-authenticator.sh instead
 ARG AWS_IAM_AUTHENTICATOR_VERSION=v0.4.0
-
+RUN apt-get update && apt-get install -y ansible
 RUN set -x && \
     apt-get update && \
     apt-get install -y jq curl && \
