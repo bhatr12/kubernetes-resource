@@ -1,7 +1,5 @@
 
-  
 #!/usr/bin/env bash
-
 # Copyright 2017, Z Lab Corporation. All rights reserved.
 # Copyright 2017, kubernetes resource contributors
 #
@@ -12,14 +10,16 @@
 setup_kubectl() {
   local payload
   payload=$1
-
+  branch_name=$(cat /tmp/build/put/service-repo/.git/branch.txt)
+  cluster_file_name=$(cat /tmp/build/put/ci-resources/ci-tasks/tool-config/branch-cluster-mappings.txt | grep $branch_name | cut -d':' -f2)
+  ansible localhost -m debug -a var='k8scertificate' -e "@/tmp/build/put/ci-resources/pipeline-parameters/secrets-params/k8s-clusters/$cluster_file_name.yml" --vault-password-file /opt/resource/passwd | sed '/^[ }].*/!s/^/"/;s/ =>/":/;1s/^/{\n/;$s/$/\n}/' | jq -r '.[] | .k8scertificate' >/opt/resource/cert_file
+  ansible localhost -m debug -a var='k8stoken' -e "@/tmp/build/put/ci-resources/pipeline-parameters/secrets-params/k8s-clusters/$cluster_file_name.yml" --vault-password-file /opt/resource/passwd | sed '/^[ }].*/!s/^/"/;s/ =>/":/;1s/^/{\n/;$s/$/\n}/' | jq -r '.[] | .k8stoken' >/opt/resource/token_file
   # the entry name for auth of kubeconfig
   local -r AUTH_NAME=auth
   # the entry name for cluster of kubeconfig
   local -r CLUSTER_NAME=cluster
   # the entry name for context of kubeconfig
   local -r CONTEXT_NAME=kubernetes-resource
-
   KUBECONFIG="$(mktemp "$TMPDIR/kubernetes-resource-kubeconfig.XXXXXX")"
   export KUBECONFIG
 
@@ -42,10 +42,10 @@ setup_kubectl() {
   else
     # Optional. The address and port of the API server. Requires token.
     local server
-    server="10.234.110.245"
+    server=$(ansible localhost -m debug -a var='k8sserver' -e "@/tmp/build/put/ci-resources/pipeline-parameters/secrets-params/k8s-clusters/$cluster_file_name.yml" --vault-password-file /opt/resource/passwd | sed '/^[ }].*/!s/^/"/;s/ =>/":/;1s/^/{\n/;$s/$/\n}/' | jq -r '.[] | .k8sserver')
     # Optional. A file to read the certificate from.
     local certificate_authority_file
-    certificate_authority_file="$(jq -r '.source.certificate_authority_file // ""' < "$payload")"
+    certificate_authority_file="/opt/resource/cert_file"
     # Optional. A certificate for the certificate authority.
     local certificate_authority
     certificate_authority="$(jq -r '.source.certificate_authority // ""' < "$payload")"
@@ -68,7 +68,7 @@ setup_kubectl() {
     set_cluster_opts=("--server=$server")
     if [[ -n "$certificate_authority" ]]; then
       local ca_file
-      ca_file=$(cat cert_file)
+      ca_file=/opt/resource/cert_file
       echo -e "$certificate_authority" > "$ca_file"
       set_cluster_opts+=("--certificate-authority=$ca_file")
     fi
@@ -84,6 +84,7 @@ setup_kubectl() {
     # Optional. Use the AWS EKS authenticator
     local use_aws_iam_authenticator
     use_aws_iam_authenticator="$(jq -r '.source.use_aws_iam_authenticator // ""' < "$payload")"
+    local aws_eks_cluster_name
     local aws_eks_cluster_name
     aws_eks_cluster_name="$(jq -r '.source.aws_eks_cluster_name // ""' < "$payload")"
     local aws_eks_assume_role
@@ -134,7 +135,7 @@ EOF
 
   # if providing a token we set a user and override context to support both kubeconfig and generated config
   local token
-  token="$(cat token_file)"
+  token="$(cat /opt/resource/token_file)"
   if [[ -n "$token" ]]; then
     # Build options for kubectl config set-credentials
     # Avoid to expose the token string by using placeholder
@@ -244,4 +245,3 @@ on_exit() {
   [[ $code -ne 0 ]] && echo && echoerr "Failed with error code $code"
   return $code
 }
-
